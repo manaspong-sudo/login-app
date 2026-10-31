@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>แดชบอร์ด</title>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<i class="blob b1"></i><i class="blob b3"></i>
+<div class="page">
+  <div class="bar"><div><h2 id="hello">กำลังโหลด…</h2><p id="role"></p></div><button class="btn out" id="out">ออกจากระบบ</button></div>
+  <div class="stats">
+    <div class="stat"><b id="s1">-</b><small>จำนวนรายการ</small></div>
+    <div class="stat"><b id="s2">-</b><small>คะแนนเฉลี่ย (%)</small></div>
+    <div class="stat"><b id="s3">-</b><small>คะแนนสูงสุด</small></div>
+  </div>
+  <div class="panel"><table><thead id="th"></thead><tbody id="tb"></tbody></table></div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+try{ if(localStorage.theme==='dark') document.documentElement.dataset.theme='dark' }catch(e){}
+$('out').onclick=async()=>{await sb.auth.signOut();location.href='index.html'};
+(async()=>{
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session){location.href='index.html';return}
+  const {data:me}=await sb.from('profiles').select('*').eq('id',session.user.id).single();
+  const admin=me&&me.role==='admin';
+  $('hello').textContent='สวัสดี '+(me?.full_name||me?.username||'ผู้ใช้');
+  $('role').textContent=admin?'ผู้ดูแลระบบ · เห็นคะแนนทุกคน':'นักเรียน';
+  const {data:rows,error}=await sb.from('scores').select('*, profiles(full_name,username)').order('created_at',{ascending:false});
+  if(error){$('tb').innerHTML='<tr><td>โหลดข้อมูลไม่สำเร็จ</td></tr>';return}
+  const pct=r=>Math.round(r.score/r.max_score*100);
+  $('s1').textContent=rows.length;
+  $('s2').textContent=rows.length?Math.round(rows.reduce((a,r)=>a+pct(r),0)/rows.length):'-';
+  $('s3').textContent=rows.length?Math.max(...rows.map(pct))+'%':'-';
+  $('th').innerHTML='<tr>'+(admin?'<th>ชื่อ</th>':'')+'<th>วิชา/บทเรียน</th><th>คะแนน</th><th>ผล</th><th>วันที่</th></tr>';
+  $('tb').innerHTML=rows.length?rows.map(r=>{const p=pct(r);
+    return '<tr>'+(admin?`<td>${esc(r.profiles?.full_name||r.profiles?.username)}</td>`:'')+
+    `<td>${esc(r.subject)}</td><td>${r.score}/${r.max_score}</td><td><span class="pill ${p>=80?'hi':p<50?'low':''}">${p}%</span></td><td>${new Date(r.created_at).toLocaleDateString('th-TH')}</td></tr>`}).join('')
+    :'<tr><td>ยังไม่มีคะแนน</td></tr>';
+})();
+function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+</script>
+</body></html>

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>เข้าสู่ระบบ</title>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;margin-bottom:6px;background:var(--line);border-radius:14px}
+.tabs button{height:38px;border:0;border-radius:11px;background:none;color:var(--muted);font:500 14px 'Prompt';cursor:pointer}
+.tabs button.on{background:var(--card);color:var(--blue2);box-shadow:0 2px 8px rgba(31,95,224,.15)}
+.msg.ok{color:var(--ok)}
+.hint{font-size:12px;color:var(--muted);margin-top:4px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<i class="blob b1"></i><i class="blob b2"></i><i class="blob b3"></i><i class="blob b4"></i>
+<div class="top"><button class="icon-btn" id="theme" aria-label="สลับธีม">🌙</button></div>
+<div class="wrap"><div class="card">
+  <div class="logo">🎓</div>
+  <h1>ระบบเรียนรู้ออนไลน์</h1>
+  <p class="sub" id="sub">เข้าสู่ระบบเพื่อดูคะแนนและผลการเรียน</p>
+
+  <div class="tabs">
+    <button id="tLogin" class="on" type="button">เข้าสู่ระบบ</button>
+    <button id="tReg" type="button">สมัครสมาชิก</button>
+  </div>
+
+  <div id="nameBox" hidden>
+    <label for="fn">ชื่อ-นามสกุล</label>
+    <div class="field"><span>🪪</span><input type="text" id="fn" autocomplete="name"></div>
+  </div>
+
+  <label for="u">ชื่อผู้ใช้</label>
+  <div class="field"><span>👤</span><input type="text" id="u" autocomplete="username"></div>
+  <div class="hint" id="uHint" hidden>ใช้ a-z ตัวเลข หรือ _ ความยาว 3-20 ตัว</div>
+
+  <label for="p">รหัสผ่าน</label>
+  <div class="field"><span>🔒</span><input type="password" id="p" autocomplete="current-password"><button class="eye" id="eye" type="button" aria-label="แสดงรหัสผ่าน">👁</button></div>
+
+  <div id="cpBox" hidden>
+    <label for="p2">ยืนยันรหัสผ่าน</label>
+    <div class="field"><span>🔒</span><input type="password" id="p2" autocomplete="new-password"></div>
+  </div>
+
+  <div class="remember" id="rmBox"><input type="checkbox" id="rm" checked><label for="rm" style="margin:0;font-weight:400">จดจำฉันไว้</label></div>
+  <button class="btn" id="go" style="margin-top:14px">เข้าสู่ระบบ</button>
+  <div class="msg" id="msg"></div>
+  <p class="note" id="note">ลืมรหัสผ่าน? ติดต่อผู้ดูแลระบบ</p>
+</div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+let mode='login';
+try{ if(localStorage.theme==='dark'){document.documentElement.dataset.theme='dark';$('theme').textContent='☀️'} }catch(e){}
+$('theme').onclick=()=>{const d=document.documentElement.dataset.theme==='dark';
+  document.documentElement.dataset.theme=d?'':'dark';$('theme').textContent=d?'🌙':'☀️';
+  try{localStorage.theme=d?'light':'dark'}catch(e){}};
+$('eye').onclick=()=>{$('p').type=$('p').type==='password'?'text':'password'};
+
+function setMode(m){
+  mode=m; const reg=m==='reg';
+  $('tLogin').classList.toggle('on',!reg); $('tReg').classList.toggle('on',reg);
+  $('nameBox').hidden=!reg; $('cpBox').hidden=!reg; $('uHint').hidden=!reg;
+  $('rmBox').hidden=reg; $('note').hidden=reg;
+  $('go').textContent=reg?'สมัครสมาชิก':'เข้าสู่ระบบ';
+  $('sub').textContent=reg?'สร้างบัญชีใหม่เพื่อเริ่มเรียน':'เข้าสู่ระบบเพื่อดูคะแนนและผลการเรียน';
+  $('p').autocomplete=reg?'new-password':'current-password';
+  $('msg').textContent='';
+}
+$('tLogin').onclick=()=>setMode('login');
+$('tReg').onclick=()=>setMode('reg');
+
+sb.auth.getSession().then(({data})=>{ if(data.session) location.href='dashboard.html' });
+
+function show(t,ok){$('msg').textContent=t;$('msg').className='msg'+(ok?' ok':'')}
+
+async function login(){
+  const u=$('u').value, p=$('p').value;
+  if(!u||!p) return show('กรอกชื่อผู้ใช้และรหัสผ่านให้ครบ');
+  $('go').disabled=true; show('');
+  const {error}=await sb.auth.signInWithPassword({email:toEmail(u),password:p});
+  $('go').disabled=false;
+  if(error) return show('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+  location.href='dashboard.html';
+}
+
+async function register(){
+  const fn=$('fn').value.trim(), u=$('u').value.trim().toLowerCase(), p=$('p').value, p2=$('p2').value;
+  if(!fn||!u||!p) return show('กรอกข้อมูลให้ครบทุกช่อง');
+  if(!/^[a-z0-9_]{3,20}$/.test(u)) return show('ชื่อผู้ใช้ใช้ได้เฉพาะ a-z ตัวเลข _ (3-20 ตัว)');
+  if(p.length<6) return show('รหัสผ่านต้องมีอย่างน้อย 6 ตัว');
+  if(p!==p2) return show('รหัสผ่านทั้งสองช่องไม่ตรงกัน');
+  $('go').disabled=true; show('');
+  const {data,error}=await sb.auth.signUp({email:toEmail(u),password:p,options:{data:{full_name:fn}}});
+  $('go').disabled=false;
+  if(error){
+    const dup=/already|registered/i.test(error.message);
+    return show(dup?'ชื่อผู้ใช้นี้ถูกใช้แล้ว ลองชื่ออื่น':'สมัครไม่สำเร็จ: '+error.message);
+  }
+  if(data.session){ location.href='dashboard.html'; return }
+  show('สมัครสำเร็จ! กรุณาเข้าสู่ระบบ',true); setMode('login'); show('สมัครสำเร็จ! กรุณาเข้าสู่ระบบ',true);
+}
+
+$('go').onclick=()=>mode==='reg'?register():login();
+document.addEventListener('keydown',e=>{if(e.key==='Enter')$('go').click()});
+</script>
+</body></html>
